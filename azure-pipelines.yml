@@ -9,29 +9,53 @@ trigger:
 pool:
   vmImage: ubuntu-latest
 
-strategy:
-  matrix:
-    NodeVersion:
-      node_version: 18.x
-    NodeVersion20:
-      node_version: 20.x
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildJob
+        strategy:
+          matrix:
+            NodeVersion:
+              node_version: 18.x
+            NodeVersion20:
+              node_version: 20.x
 
-steps:
-  - task: NodeTool@0
-    inputs:
-      versionSpec: $(node_version)
-    displayName: "Install Node.js"
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(node_version)
+            displayName: "Install Node.js"
 
-  - script: |
-      npm ci
-    displayName: "npm install"
+          - script: |
+              npm ci
+            displayName: "npm install"
 
-  - script: |
-      npm run build
-    displayName: "npm build"
+          - script: |
+              npm run build
+            displayName: "npm build"
 
-  - task: PublishBuildArtifacts@1
-    inputs:
-      PathtoPublish: "build"
-      ArtifactName: "drop"
-      publishLocation: "Container"
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: "build"
+              ArtifactName: "drop"
+              publishLocation: "Container"
+
+  - stage: Deploy
+    dependsOn: Build
+    jobs:
+      - deployment: DeployJob
+        environment: "production"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    downloadType: "single"
+                    artifactName: "drop"
+                    downloadPath: "$(System.ArtifactsDirectory)"
+
+                - script: |
+                    echo "Deployment steps here. For example, copy to web server or use Azure CLI to deploy."
+                    # Add your deployment commands, e.g., az storage blob upload-batch, or deploy to Azure Static Web Apps
+                  displayName: "Deploy to production"
